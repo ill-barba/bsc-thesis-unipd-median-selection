@@ -131,6 +131,53 @@ def thinning(sample: list[int | float]) -> None:
     del sample[s // 2:]
 
 
+
+def merge(first_subsample: list[int | float], buffer: list[int | float]) -> None:
+    """Fonde due sottocampioni ordinati nel buffer di lavoro, sul posto.
+
+    All'ingresso `first_subsample` contiene il primo sottocampione (h elementi)
+    e `buffer` ha 2h celle: nelle quali le prime h contengono il secondo sottocampione,
+    le altre h, invece, sono libere. Entrambi i sottocampioni sono ordinati in modo 
+    decrescente. Alla fine `buffer` conterrà i 2h elementi fusi, in ordine decrescente,
+    mentre `first_subsample` non cambia.
+
+    Args:
+        first_subsample: primo sottocampione, ordinato in modo decrescente.
+        buffer: buffer di lavoro di 2h celle, già allocato alla chiamata.
+
+    Raises:
+        ValueError: se il primo sottocampione è vuoto o il buffer non ha
+            esattamente 2h celle.
+    """
+    h = len(first_subsample)
+    if h == 0 or len(buffer) != 2 * h:
+        raise ValueError(
+            "Il buffer deve avere dimensione doppia rispetto al sottocampione"
+        )
+
+    i = h - 1       # ultimo elemento del primo sottocampione ancora da copiare
+    j = h - 1       # ultimo elemento del secondo sottocampione (nel buffer)
+    k = 2 * h - 1   # prossima cella del buffer in cui scrivere
+
+    while i >= 0 and j >= 0:
+        if first_subsample[i] < buffer[j]:
+            buffer[k] = first_subsample[i]
+            i -= 1
+        else:
+            buffer[k] = buffer[j]
+            j -= 1
+        k -= 1
+
+    # Se è finito il secondo sottocampione, restano elementi del primo
+    # da copiare. Se è finito il primo, quelli rimasti nel buffer sono
+    # già nella posizione corretta
+    while i >= 0:
+        buffer[k] = first_subsample[i]
+        i -= 1
+        k -= 1
+
+
+
 # test con data/demo.txt
 # NB: viene eseguito solo se il file viene lanciato come main,
 # quindi ignorato se viene importato.
