@@ -5,6 +5,10 @@ documento. Il codice non può verificarlo in generale perchè controllarlo dentr
 richiederebbe di ricordare gli elementi già letti, cioè O(N) memoria,
 contravvenendo al vincolo su S. Il controllo, se serve, va fatto fuori dall'algoritmo.
 """
+
+# Libreria per rappresentare i filtri iniziali +inf e -inf
+import math
+
 # Tipo per flussi di input come ad es: file aperti, stdin, ecc.
 from typing import TextIO
 
@@ -80,7 +84,7 @@ def sample_base(stream: CandidateStream, s: int, buffer: list[int | float]) -> N
     """Costruisce il campione di livello 0 nel buffer di lavoro.
 
     Se il nastro finisce prima di aver letto s candidati, il campione viene
-    completato con elementi fittizi (padding). Gli elementi di padding valgono 
+    completato con elementi fittizi (padding). Gli elementi di padding valgono
     tutti f_min e si considerano distinti per posizione occupata.
 
     Args:
@@ -93,7 +97,7 @@ def sample_base(stream: CandidateStream, s: int, buffer: list[int | float]) -> N
     
     if len(buffer) != s:
         raise ValueError("Il buffer deve avere dimensione s")
-
+    
     for i in range(s):
         x = stream.next_cand()
         if x is None:
@@ -136,7 +140,7 @@ def merge(first_subsample: list[int | float], buffer: list[int | float]) -> None
 
     All'ingresso `first_subsample` contiene il primo sottocampione (h elementi)
     e `buffer` ha 2h celle: nelle quali le prime h contengono il secondo sottocampione,
-    le altre h, invece, sono libere. Entrambi i sottocampioni sono ordinati in modo 
+    le altre h, invece, sono libere. Entrambi i sottocampioni sono ordinati in modo
     decrescente. Alla fine `buffer` conterrà i 2h elementi fusi, in ordine decrescente,
     mentre `first_subsample` non cambia.
 
@@ -175,6 +179,103 @@ def merge(first_subsample: list[int | float], buffer: list[int | float]) -> None
         i -= 1
         k -= 1
 
+
+
+def sample(
+    i: int,
+    s: int,
+    stream: CandidateStream,
+    buffer: list[int | float],
+    saved_halves: list[list[int | float]]
+) -> None:
+    """Costruisce ricorsivamente il campione SAMPLE(i, s).
+
+    Il caso base legge s candidati dal nastro. Per i > 0 vengono costruiti
+    due campioni di livello i-1, dimezzati tramite thinning e poi fusi con merge.
+    Tutte le chiamate condividono lo stesso stream e buffer.
+
+    Ogni livello conserva il primo sottocampione in saved_halves[i-1],
+    mentre le chiamate inferiori utilizzano soltanto le posizioni precedenti.
+
+    Args:
+        i: livello del campione, compreso tra 0 e len(saved_halves).
+        s: dimensione del campione, intero positivo e pari.
+        stream: stream condiviso da cui leggere i candidati.
+        buffer: buffer di lavoro di s celle, già allocato.
+        saved_halves: r sottocampioni di s/2 celle, già allocati.
+
+    Raises:
+        ValueError: se il livello o le dimensioni non sono validi.
+    """
+    if i < 0 or i > len(saved_halves):
+        raise ValueError("Livello ricorsivo non valido")
+
+    if s <= 0 or s % 2 != 0 or len(buffer) != s:
+        raise ValueError("Dimensione del campione o del buffer non valida")
+
+    # Caso base: costruisce direttamente il campione di livello 0
+    if i == 0:
+        sample_base(stream, s, buffer)
+        return
+
+    first_subsample = saved_halves[i - 1]
+    if len(first_subsample) != s // 2:
+        raise ValueError("Il sottocampione conservato deve avere s/2 celle")
+
+    # Costruisce il primo campione e ne conserva le posizioni pari
+    sample(i - 1, s, stream, buffer, saved_halves)
+    thinning(buffer, s)
+
+    for j in range(s // 2):
+        first_subsample[j] = buffer[j]
+
+    # Costruisce il secondo campione, continuando sullo stesso nastro
+    sample(i - 1, s, stream, buffer, saved_halves)
+    thinning(buffer, s)
+
+    # Fonde i due sottocampioni nel buffer condiviso
+    merge(first_subsample, buffer)
+
+
+def pass_scan(
+    stream: CandidateStream,
+    r: int,
+    s: int,
+    buffer: list[int | float],
+    saved_halves: list[list[int | float]]
+) -> tuple[int, int]:
+    """Costruisce SAMPLE(r, s) e completa la lettura della passata.
+
+    Dopo il campionamento, legge il resto del nastro per aggiornare
+    i contatori su tutti gli N elementi e calcola i ranghi dei filtri.
+
+    Il numero di candidati si ricava dai ranghi:
+    n = rank_min - rank_max - 1.
+
+    Args:
+        stream: stream della passata corrente, con i filtri correnti.
+        r: livello del campione da costruire.
+        s: dimensione del campione, intero positivo e pari.
+        buffer: buffer di lavoro di s celle, già allocato.
+        saved_halves: r sottocampioni di s/2 celle, già allocati.
+
+    Returns:
+        Coppia (rank_max, rank_min) rispettivamente ranghi di f_max e f_min.
+    """
+    # Costruisce il campione, che potrebbe non consumare tutto il nastro
+    sample(r, s, stream, buffer, saved_halves)
+
+    # Completa la scansione per ottenere i contatori definitivi
+    stream.finish_scan()
+
+    # Calcola i ranghi come la funzione "rho" nella tesi
+    if stream.f_max == math.inf:
+        rank_max = 0
+    else:
+        rank_max = stream.q_max + 1
+    rank_min = stream.q_min + 1
+
+    return rank_max, rank_min
 
 
 # test con data/demo.txt
