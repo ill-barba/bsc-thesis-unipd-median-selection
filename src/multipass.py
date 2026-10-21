@@ -76,8 +76,8 @@ class CandidateStream:
                 break
 
 
-def sample_base(stream: CandidateStream, s: int) -> list[int | float]:
-    """Costruisce il campione di livello 0 con s candidati in ordine decrescente.
+def sample_base(stream: CandidateStream, s: int, buffer: list[int | float]) -> None:
+    """Costruisce il campione di livello 0 nel buffer di lavoro.
 
     Se il nastro finisce prima di aver letto s candidati, il campione viene
     completato con elementi fittizi (padding). Gli elementi di padding valgono 
@@ -86,50 +86,49 @@ def sample_base(stream: CandidateStream, s: int) -> list[int | float]:
     Args:
         stream: sequenza da cui leggere i candidati (il cursore è condiviso).
         s: dimensione del campione, che è intero positivo e pari.
-
-    Returns:
-        Lista di esattamente s elementi, ordinata in modo decrescente.
+        buffer: buffer di lavoro di s celle, già allocato dal chiamante.
     """
     if s <= 0 or s % 2 != 0:
         raise ValueError("s deve essere un intero positivo e pari")
+    
+    if len(buffer) != s:
+        raise ValueError("Il buffer deve avere dimensione s")
 
-    sample: list[int | float] = []
-    for _ in range(s):
+    for i in range(s):
         x = stream.next_cand()
         if x is None:
-            # Il padding usa f_min, sempre inferiore ai candidati reali
-            # NB: un valore fisso (es. 0) potrebbe invece rientrare tra i filtri
+            # Il padding usa f_min, che è sempre inferiore ai candidati reali.
+            # NB: un valore fisso (ad es. 0) potrebbe invece rientrare tra i filtri.
             x = stream.f_min
-        sample.append(x)
+        buffer[i] = x
 
-    sample.sort(reverse=True)
-    return sample
+    buffer.sort(reverse=True)
 
 
-def thinning(sample: list[int | float]) -> None:
-    """Dimezza il campione tenendo le posizioni pari, direttamente nella lista.
+def thinning(buffer: list[int | float], n: int) -> int:
+    """Conserva le posizioni pari nelle prime n/2 celle del buffer.
 
-    Il campione deve avere dimensione positiva, pari ed essere già ordinato
-    in modo decrescente. Al termine conterrà s/2 elementi.
+    Il buffer non viene ridimensionato, solo le prime n/2 celle
+    contengono il sottocampione valido dopo il thinning.
 
     Args:
-        sample: campione di s elementi, modificato in-place.
+        buffer: buffer contenente il campione ordinato.
+        n: numero di elementi validi prima del thinning.
 
+    Returns:
+        Numero di elementi validi dopo il thinning.
+    
     Raises:
         ValueError: se la dimensione non è un intero positivo e pari.
     """
-    s = len(sample)
-    if s <= 0 or s % 2 != 0:
-        raise ValueError("Il campione deve avere dimensione positiva e pari")
+    if n <= 0 or n % 2 != 0 or n > len(buffer):
+        raise ValueError("La dimensione del campione non è valida")
 
-    # Sposta gli elementi nelle posizioni pari all'inizio della stessa lista,
-    # gli elementi sovrascritti non serviranno più
-    for j in range(s // 2):
-        sample[j] = sample[2*j + 1]
+    # Sposta gli elementi delle posizioni pari all'inizio del buffer.
+    for j in range(n // 2):
+        buffer[j] = buffer[2 * j + 1]
 
-    # Elimina la parte della lista che non serve più
-    del sample[s // 2:]
-
+    return n // 2
 
 
 def merge(first_subsample: list[int | float], buffer: list[int | float]) -> None:
