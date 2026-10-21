@@ -123,7 +123,8 @@ def thinning(buffer: list[int | float], n: int) -> int:
         Numero di elementi validi dopo il thinning.
     
     Raises:
-        ValueError: se la dimensione non è un intero positivo e pari.
+        ValueError: se n non è un intero positivo e pari, oppure supera
+            la lunghezza del buffer.
     """
     if n <= 0 or n % 2 != 0 or n > len(buffer):
         raise ValueError("La dimensione del campione non è valida")
@@ -178,7 +179,6 @@ def merge(first_subsample: list[int | float], buffer: list[int | float]) -> None
         buffer[k] = first_subsample[i]
         i -= 1
         k -= 1
-
 
 
 def sample(
