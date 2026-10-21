@@ -1,4 +1,10 @@
-"""Simulazione del nastro di input e lettura dei candidati durante una passata."""
+"""Simulazione del nastro di input e lettura dei candidati durante una passata.
+
+Precondizione: gli N elementi dell'input sono tutti distinti, come descritto nel
+documento. Il codice non può verificarlo in generale perchè controllarlo dentro l'algoritmo
+richiederebbe di ricordare gli elementi già letti, cioè O(N) memoria,
+contravvenendo al vincolo su S. Il controllo, se serve, va fatto fuori dall'algoritmo.
+"""
 # Tipo per flussi di input come ad es: file aperti, stdin, ecc.
 from typing import TextIO
 
@@ -70,6 +76,61 @@ class CandidateStream:
                 break
 
 
+def sample_base(stream: CandidateStream, s: int) -> list[int | float]:
+    """Costruisce il campione di livello 0 con s candidati in ordine decrescente.
+
+    Se il nastro finisce prima di aver letto s candidati, il campione viene
+    completato con elementi fittizi (padding). Gli elementi di padding valgono 
+    tutti f_min e si considerano distinti per posizione occupata.
+
+    Args:
+        stream: sequenza da cui leggere i candidati (il cursore è condiviso).
+        s: dimensione del campione, che è intero positivo e pari.
+
+    Returns:
+        Lista di esattamente s elementi, ordinata in modo decrescente.
+    """
+    if s <= 0 or s % 2 != 0:
+        raise ValueError("s deve essere un intero positivo e pari")
+
+    sample: list[int | float] = []
+    for _ in range(s):
+        x = stream.next_cand()
+        if x is None:
+            # Il padding usa f_min, sempre inferiore ai candidati reali
+            # NB: un valore fisso (es. 0) potrebbe invece rientrare tra i filtri
+            x = stream.f_min
+        sample.append(x)
+
+    sample.sort(reverse=True)
+    return sample
+
+
+def thinning(sample: list[int | float]) -> None:
+    """Dimezza il campione tenendo le posizioni pari, direttamente nella lista.
+
+    Il campione deve avere dimensione positiva, pari ed essere già ordinato
+    in modo decrescente. Al termine conterrà s/2 elementi.
+
+    Args:
+        sample: campione di s elementi, modificato in-place.
+
+    Raises:
+        ValueError: se la dimensione non è un intero positivo e pari.
+    """
+    s = len(sample)
+    if s <= 0 or s % 2 != 0:
+        raise ValueError("Il campione deve avere dimensione positiva e pari")
+
+    # Sposta gli elementi nelle posizioni pari all'inizio della stessa lista,
+    # gli elementi sovrascritti non serviranno più
+    for j in range(s // 2):
+        sample[j] = sample[2*j + 1]
+
+    # Elimina la parte della lista che non serve più
+    del sample[s // 2:]
+
+
 # test con data/demo.txt
 # NB: viene eseguito solo se il file viene lanciato come main,
 # quindi ignorato se viene importato.
@@ -82,6 +143,6 @@ if __name__ == "__main__":
             if candidate is None:
                 break
             print("Candidato:", candidate)
-            
+
         print("q_max =", stream.q_max)
         print("q_min =", stream.q_min)
