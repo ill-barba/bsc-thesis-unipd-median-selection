@@ -9,8 +9,8 @@ contravvenendo al vincolo su S. Il controllo, se serve, va fatto fuori dall'algo
 # Libreria per rappresentare i filtri iniziali +inf e -inf
 import math
 
-# Tipo per flussi di input come ad es: file aperti, stdin, ecc.
-from typing import TextIO
+# Tipi per i flussi di input (file, stdin, ecc.) e per restituire risultati con parametri "nominati"
+from typing import Literal, NamedTuple, TextIO
 
 
 class CandidateStream:
@@ -276,6 +276,153 @@ def pass_scan(
     rank_min = stream.q_min + 1
 
     return rank_max, rank_min
+
+
+class PassResult(NamedTuple):
+    """Risultato di una passata, resoconto con label se trovata oppure nuovi filtri.
+
+    Se lo status è "Found", value contiene l'elemento di rango k e gli altri
+    campi non servono. Se, invece, è "Continue" value è None e gli altri tre
+    campi contengono i parametri per la passata successiva.
+    """
+
+    status: Literal["Found", "Continue"]
+    value: int | float | None
+    f_min: int | float
+    f_max: int | float
+    n_bar: int
+
+
+def single_pass(
+    tape: TextIO,
+    k: int,
+    S: int,
+    f_min: int | float,
+    f_max: int | float,
+    n_bar: int,
+) -> PassResult:
+    """Esegue una passata della procedura PASS.
+
+    Calcola i parametri s e r in base alla memoria disponibile e al limite
+    corrente dei candidati. Costruisce poi il campione e determina i ranghi
+    dei filtri attraverso una scansione completa del nastro.
+
+    Se uno dei filtri ha rango k, restituisce l'elemento cercato.
+    Altrimenti sceglie i nuovi filtri dal campione e aggiorna il limite
+    superiore al numero di candidati per la passata successiva.
+
+    NB: la funzione va chiamata solo quando n_bar > S - 2.
+    Se i candidati sono già in memoria, non serve costruire
+    un nuovo campione.
+
+    Args:
+        tape: nastro di input, che deve poter essere riavvolto.
+        k: rango cercato nell'input originale.
+        S: memoria disponibile, espressa in celle logiche.
+        f_min: filtro inferiore corrente.
+        f_max: filtro superiore corrente.
+        n_bar: limite superiore al numero di candidati.
+
+    Returns:
+        PassResult con stato "Found" oppure "Continue".
+        Nel secondo caso contiene i nuovi filtri e il nuovo n_bar.
+
+    Raises:
+        ValueError: se n_bar non è maggiore di 1, se la memoria non permette
+            di costruire il campione, se il vincolo S non è rispettato
+            oppure se le posizioni dei nuovi filtri non sono valide.
+    """
+    if n_bar <= 1:
+        raise ValueError("Il limite dei candidati deve essere maggiore di 1")
+
+    # Calcola la dimensione del campione con memoria disponibile
+    s = 2 * math.floor(S / (2 * math.log2(n_bar)))
+
+    if s < 2:
+        raise ValueError("Memoria insufficiente per costruire il campione")
+
+    # Sceglie il minimo livello r tale che s * 2**r >= n_bar
+    r = ((n_bar + s - 1) // s - 1).bit_length()
+
+    # Verifica che campione, sottocampioni e filtri rispettino il limite S
+    if r * s // 2 + s + 2 > S:
+        raise ValueError("Vincolo di memoria S non rispettato")
+
+    # Alloca il buffer di lavoro e i sottocampioni conservati dalla ricorsione
+    buffer: list[int | float] = [0] * s
+    saved_halves: list[list[int | float]] = [
+        [0] * (s // 2) for _ in range(r)
+    ]
+
+    # Ogni passata deve rileggere il nastro dall'inizio
+    tape.seek(0)
+    stream = CandidateStream(tape, f_min, f_max)
+
+    # Costruisce il campione e calcola i ranghi dei filtri correnti
+    rank_max, rank_min = pass_scan(stream, r, s, buffer, saved_halves)
+
+    # Se un filtro ha rango k, l'elemento cercato è già stato trovato
+    if rank_max == k:
+        return PassResult("Found", f_max, f_min, f_max, n_bar)
+
+    if rank_min == k:
+        return PassResult("Found", f_min, f_min, f_max, n_bar)
+
+    # Individua le posizioni dei nuovi filtri nel campione
+    _, u, v = relative_rank(k, rank_max, r)
+
+    if not (1 <= v <= s) or u > v:
+        raise ValueError("Posizioni dei filtri non valide")
+
+    # Se u <= 0, il campione non fornisce un nuovo filtro superiore, quindi
+    # in questo caso manteniamo quello corrente
+    new_f_max = f_max
+    if u >= 1:
+        new_f_max = buffer[u - 1]
+
+    # Il filtro inferiore è l'elemento in posizione v del campione
+    new_f_min = buffer[v - 1]
+
+    # Aggiorna il bound teorico sui candidati per la prossima passata
+    new_n_bar = (2 * r - 1) * 2**r
+
+    return PassResult("Continue", None, new_f_min, new_f_max, new_n_bar)
+
+
+def relative_rank(k: int, rank_max: int, r: int) -> tuple[int, int, int]:
+    """Calcola il rango relativo e le posizioni dei nuovi filtri.
+
+    Le posizioni u e v sono "shifatate" di una posizione 1  per rendere 
+    coerente la notazione presente nella tesi e l'implementazione in python,
+    che come primo indice disponibile ha 0.
+    Inoltre si assume che il chiamante abbia già verificato che l'elemento
+    cercato non coincida con uno dei filtri correnti.
+
+    Se u <= 0, il nuovo filtro superiore non viene selezionato
+    dal campione e quello corrente rimane invariato.
+
+    Args:
+        k: rango cercato nell'input originale.
+        rank_max: rango del filtro superiore corrente.
+        r: livello del campione costruito da SAMPLE.
+
+    Returns:
+        Terna (kappa, u, v) rispettivamente il rango relativo e le posizioni dei nuovi filtri.
+
+    Raises:
+        ValueError: se r è negativo o k <= rank_max.
+    """
+    if r < 0 or k <= rank_max:
+        raise ValueError("Rango cercato o livello non valido")
+
+    # Calcola il rango relativo rispetto al filtro superiore
+    kappa = k - rank_max
+
+    # Calcola le posizioni dei nuovi filtri, con arrotondamento per eccesso
+    v = (kappa + 2**r - 1) // (2**r)
+    u = v - r
+
+    return kappa, u, v
 
 
 # test con data/demo.txt
