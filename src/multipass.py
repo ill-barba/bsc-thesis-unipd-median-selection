@@ -407,7 +407,7 @@ def relative_rank(k: int, rank_max: int, r: int) -> tuple[int, int, int]:
         r: livello del campione costruito da SAMPLE.
 
     Returns:
-        Terna (kappa, u, v) rispettivamente il rango relativo e le posizioni dei nuovi filtri.
+        Terna (k_C, u, v) rispettivamente il rango relativo e le posizioni dei nuovi filtri.
 
     Raises:
         ValueError: se r è negativo o k <= rank_max.
@@ -416,18 +416,102 @@ def relative_rank(k: int, rank_max: int, r: int) -> tuple[int, int, int]:
         raise ValueError("Rango cercato o livello non valido")
 
     # Calcola il rango relativo rispetto al filtro superiore
-    kappa = k - rank_max
+    k_C = k - rank_max
 
     # Calcola le posizioni dei nuovi filtri, con arrotondamento per eccesso
-    v = (kappa + 2**r - 1) // (2**r)
+    v = (k_C + 2**r - 1) // (2**r)
     u = v - r
 
-    return kappa, u, v
+    return k_C, u, v
+
+
+def mp_select(tape: TextIO, k: int, S: int, N: int) -> int | float:
+    """Trova l'elemento di rango generico k con l'algoritmo multi-pass MP-SELECT.
+
+    Ripete la procedura PASS finché il limite dei candidati supera S - 2.
+    Quando i candidati possono essere contenuti in memoria, esegue
+    un'ultima scansione, li ordina e seleziona l'elemento cercato.
+
+    Args:
+        tape: nastro di input con N elementi distinti, che deve poter
+            essere riavvolto.
+        k: rango cercato, con k = 1 corrispondente al massimo.
+        S: memoria disponibile.
+        N: numero di elementi presenti nel nastro.
+
+    Returns:
+        Elemento dell'input avente rango k.
+
+    Raises:
+        ValueError: se i parametri non sono validi, la memoria non è
+            sufficiente oppure il limite dei candidati non diminuisce.
+    """
+    if N <= 0 or not (1 <= k <= N):
+        raise ValueError("N oppure rango k non valido")
+
+    if S < 3:
+        raise ValueError("La memoria S deve contenere almeno 3 celle")
+
+    # Inizialmente tutti gli N elementi sono candidati, tra le sentinelle
+    f_min: int | float = -math.inf
+    f_max: int | float = math.inf
+    n_bar = N
+
+    # Ripete PASS finché i candidati non possono stare tutti in memoria
+    while n_bar > S - 2:
+        result = single_pass(tape, k, S, f_min, f_max, n_bar)
+
+        # Se PASS trova l'elemento, termina
+        if result.status == "Found":
+            assert result.value is not None
+            return result.value
+
+        # Controllo per evitare cicli infiniti, quando il bound teorico non diminuisce
+        if result.n_bar >= n_bar:
+            raise ValueError("S insufficiente: il limite dei candidati non diminuisce")
+
+        # Prepara i parametri per la passata successiva
+        f_min = result.f_min
+        f_max = result.f_max
+        n_bar = result.n_bar
+
+    # I candidati rimasti sono al massimo S - 2, possono stare in memoria
+    tape.seek(0)
+    stream = CandidateStream(tape, f_min, f_max)
+    candidates: list[int | float] = []
+
+    # Ultima scansione, conserva soltanto gli elementi tra i filtri
+    while True:
+        x = stream.next_cand()
+        if x is None:
+            break
+        candidates.append(x)
+
+    # Il ciclo ha letto tutto il nastro, quindi q_max e q_min sono già completi
+    if f_max == math.inf:
+        rank_max = 0
+    else:
+        rank_max = stream.q_max + 1
+
+    rank_min = stream.q_min + 1
+
+    # Se rango coincide con uno dei due filtri
+    if k == rank_max:
+        return f_max
+
+    if k == rank_min:
+        return f_min
+
+    # Ordina i candidati e seleziona quello di rango relativo k_C
+    candidates.sort(reverse=True)
+    k_C = k - rank_max
+
+    return candidates[k_C - 1]
 
 
 # test con data/demo.txt
 # NB: viene eseguito solo se il file viene lanciato come main,
-# quindi ignorato se viene importato.
+# quindi ignorato se viene importato
 if __name__ == "__main__":
     with open("data/demo.txt", encoding="utf-8") as tape:
         stream = CandidateStream(tape, f_min=3, f_max=9)
