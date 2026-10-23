@@ -1,24 +1,25 @@
-"""Parte sperimentale sull'algoritmo MP-SELECT.
+"""Strumenti di misurazione per gli esperimenti su MP-SELECT.
 
-Il file si limita a contare le passate sul nastro (P) e, dopo ogni passata 
-di campionamento, a confrontare il numero reale di candidati n con 
+Il file si limita a contare le passate sul nastro (P) e, dopo ogni passata
+di campionamento, a confrontare il numero reale di candidati n con
 il bound teorico n_bar.
 
 NB: le liste usate per le misure non contano nella memoria S dell'algoritmo.
 Servono solo a verificare i risultati, e trarne delle conclusioni analitiche.
 
-Per eseguire dalla cartella principale del progetto si consiglia:
-    python experiments/experiments_multipass.py
+Questo file viene importato dagli script degli esperimenti nella cartella
+experiments e non va eseguito direttamente.
 """
 
 import csv
 import io
+import math
 import random
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
-# Così il file si può lanciare anche da dentro la cartella experiments
+# Permette di importare src.multipass dagli script nella cartella experiments
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -29,8 +30,8 @@ class CountingTape(io.StringIO):
     """Nastro di testo che conta quante volte viene riavvolto con seek(0).
 
     Ogni seek(0) segna l'inizio di una nuova scansione completa, quindi
-    l'inizio di una nuova passata. Dunque il contatore coincide con P. 
-    NB: non contiamo le readline, a fine nastro il padding ne fa molte in più 
+    l'inizio di una nuova passata. Dunque il contatore coincide con P.
+    NB: non contiamo le readline, a fine nastro il padding ne fa molte in più
     e il conto sarebbe falsato.
     """
 
@@ -46,37 +47,118 @@ class CountingTape(io.StringIO):
         return super().seek(pos, whence)
 
 
-def generate_values(N: int, seed: int) -> list[int]:
-    """Genera una permutazione dei numeri da 1 a N, sempre la stessa per un dato seed."""
+def generate_values(N: int, seed: int, ordine: str = "casuale") -> list[int]:
+    """Genera i numeri da 1 a N nell'ordine scelto.
+
+    L'ordine casuale è riproducibile usando lo stesso seed. Negli altri
+    due casi il seed non viene utilizzato.
+    """
     if N <= 0:
         raise ValueError("N deve essere positivo")
 
     values = list(range(1, N + 1))
-    random.Random(seed).shuffle(values)
+    if ordine == "casuale":
+        random.Random(seed).shuffle(values)
+    elif ordine == "decrescente":
+        values.reverse()
+    elif ordine != "crescente":
+        raise ValueError("Ordine non valido: usare casuale, crescente o decrescente")
+
     return values
 
 
-def run_experiment(N: int, S: int, k: int, seed: int) -> tuple[int, int, list[dict]]:
+def theoretical_metrics(N: int, S: int) -> tuple[int, int, list[dict]]:
+    """Calcola P massimo e celle logiche usando la ricorrenza di n_bar.
+
+    Ripete gli stessi calcoli di s, r e n_bar presenti in single_pass,
+    ma senza leggere dati e senza eseguire l'algoritmo.
+
+    Args:
+        N: numero di elementi dell'input.
+        S: celle logiche disponibili.
+
+    Returns:
+        Terna (P_max, celle_max, righe). Le righe descrivono ogni PASS
+        teorica e l'ultima passata finale. Per quest'ultima le celle
+        indicate sono un limite superiore (n_bar + 2), non una misura
+        del numero di candidati realmente caricati.
+
+    Raises:
+        ValueError: se N o S non sono validi, il campione non rispetta
+            la memoria disponibile oppure n_bar non diminuisce.
+    """
+    if N <= 0 or S < 3:
+        raise ValueError("N oppure memoria S non validi")
+
+    n_bar = N
+    rows: list[dict] = []
+
+    while n_bar > S - 2:
+        # Stesse formule usate dall'implementazione di PASS.
+        s = 2 * math.floor(S / (2 * math.log2(n_bar)))
+        if s < 2:
+            raise ValueError("Memoria insufficiente per costruire il campione")
+
+        r = ((n_bar + s - 1) // s - 1).bit_length()
+        celle = r * s // 2 + s + 2
+        if celle > S:
+            raise ValueError("Vincolo di memoria S non rispettato")
+
+        new_n_bar = (2 * r - 1) * 2**r
+        if new_n_bar >= n_bar:
+            raise ValueError("S insufficiente: il limite dei candidati non diminuisce")
+
+        rows.append({
+            "passata": len(rows) + 1,
+            "fase": "PASS",
+            "n_bar_in": n_bar,
+            "s": s,
+            "r": r,
+            "n_bar_out": new_n_bar,
+            "celle": celle,
+        })
+        n_bar = new_n_bar
+
+    # Dopo il campionamento i candidati rimasti entrano tutti in memoria.
+    # Qui n_bar + 2 è il massimo teorico per candidati e due filtri.
+    rows.append({
+        "passata": len(rows) + 1,
+        "fase": "Final",
+        "n_bar_in": n_bar,
+        "s": "",
+        "r": "",
+        "n_bar_out": n_bar,
+        "celle": n_bar + 2,
+    })
+
+    P_max = len(rows)
+    celle_max = max(row["celle"] for row in rows)
+    return P_max, celle_max, rows
+
+
+def run_experiment(N: int, S: int, k: int, seed: int,
+                ordine: str = "casuale") -> tuple[int, int, list[dict]]:
     """Esegue MP-SELECT e misura P e il rapporto n/n_bar dopo ogni PASS.
 
     Args:
         N: numero di elementi distinti sul nastro.
         S: celle logiche di memoria disponibili.
         k: rango cercato, in ordine decrescente.
-        seed: seme per generare la permutazione dell'input.
+        seed: seme per generare la permutazione casuale.
+        ordine: casuale, crescente oppure decrescente.
 
     Returns:
         Una terna (risultato, P, righe). Ogni riga corrisponde a una passata
         di campionamento. Se PASS ritorna Found non ci sono nuovi filtri,
         quindi n e n/n_bar sono vuoti.
     """
-    values = generate_values(N, seed)
+    values = generate_values(N, seed, ordine)
     tape = CountingTape(values)
     rows: list[dict] = []
     original_pass = multipass.single_pass
 
     def observed_pass(tape, k, S, f_min, f_max, n_bar):
-        """Esegue una instantanea di ogni passata e dei relativi risultati."""
+        """Esegue una passata e ne registra i risultati."""
         result = original_pass(tape, k, S, f_min, f_max, n_bar)
         row = {
             "passata": len(rows) + 1,
@@ -115,14 +197,14 @@ def run_experiment(N: int, S: int, k: int, seed: int) -> tuple[int, int, list[di
     finally:
         tape.close()
 
-    # Eseguo re-mapping, una permutazione di 1..N il k-esimo più grande vale N + 1 - k
+    # Verifico il risultato: tra 1 e N, il k-esimo più grande vale N + 1 - k
     expected = N + 1 - k
     if answer != expected:
         raise AssertionError(f"Risultato errato! atteso: {expected} invece si è ottenuto: {answer}")
 
     P = tape.passes
-    # Se l'ultima PASS non ha trovato il risultato, c'è ancora la passata finale
-    # in memori, per questo P vale una in più delle righe.
+    # Se nessuna PASS ha trovato il risultato, si esegue la passata finale
+    # per raccogliere i candidati in memoria: P vale una in più delle righe.
     found = bool(rows and rows[-1]["stato"] == "Found")
     expected_passes = len(rows) if found else len(rows) + 1
     if P != expected_passes:
@@ -154,25 +236,3 @@ def save_csv(path: Path, N: int, S: int, k: int, seed: int,
                 "N": N, "S": S, "k": k, "seed": seed,
                 "risultato": answer, "P": P, **row,
             })
-
-
-if __name__ == "__main__":
-    # prova
-    N = 1000
-    S = 418
-    k = 400
-    seed = 2026
-
-    answer, P, rows = run_experiment(N, S, k, seed)
-    csv_path = Path(__file__).resolve().parent / "results" / "demo.csv"
-    save_csv(csv_path, N, S, k, seed, answer, P, rows)
-
-    print(f"N={N}, S={S}, k={k}, risultato={answer}, P={P}")
-    for row in rows:
-        if row["stato"] == "Continue":
-            print(
-                f"Passata {row['passata']}: "
-                f"n={row['n']}, n_bar={row['n_bar']}, "
-                f"n/n_bar={row['n_su_n_bar']:.3f}"
-            )
-    print(f"Risultati salvati in: {csv_path}")

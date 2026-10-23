@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Risultati temporanei degli esperimenti
+experiments/results/demo.csv
+experiments/results/p_vs_s_pilot.csv
+experiments/results/*.png
