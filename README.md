@@ -7,6 +7,10 @@ like a tape, using just S cells of working memory. The less memory you have,
 the more passes over the input you need. The experiments measure exactly that
 trade-off.
 
+## Thesis
+
+The bachelor's thesis (in Italian) is available as a [PDF](thesis-alessandro-barbacetto.pdf).
+
 ## Layout
 
 ```text
@@ -20,6 +24,7 @@ trade-off.
 │   ├── experiment_passes.py      # experiment A: passes vs memory
 │   ├── experiment_candidates.py  # experiment B: candidates vs bound
 │   └── results/                  # CSV data and PDF figures
+├── thesis-alessandro-barbacetto.pdf  # bachelor's thesis (Italian)
 ├── README.md
 ├── LICENSE                       # Apache License 2.0
 └── NOTICE                        # attribution notice
