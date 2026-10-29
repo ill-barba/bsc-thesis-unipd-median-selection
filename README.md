@@ -7,27 +7,33 @@ like a tape, using just S cells of working memory. The less memory you have,
 the more passes over the input you need. The experiments measure exactly that
 trade-off.
 
+
 ## Thesis
 
-The bachelor's thesis (in Italian) is available as a [PDF](thesis-alessandro-barbacetto.pdf).
+The bachelor's thesis is available in two languages:
+
+- [Italian version (PDF)](thesis-alessandro-barbacetto.pdf)
+- [English version (PDF)](thesis-alessandro-barbacetto-ENG.pdf)
+
 
 ## Layout
 
 ```text
 .
 ├── src/
-│   └── multipass.py              # the algorithm (MP-SELECT)
+│   └── multipass.py                # the algorithm (MP-SELECT)
 ├── tests/
-│   └── test_multipass.py         # pytest suite for the algorithm
+│   └── test_multipass.py           # pytest suite for the algorithm
 ├── experiments/
-│   ├── metrics_multipass.py      # helpers: counts passes and candidates
-│   ├── experiment_passes.py      # experiment A: passes vs memory
-│   ├── experiment_candidates.py  # experiment B: candidates vs bound
-│   └── results/                  # CSV data and PDF figures
-├── thesis-alessandro-barbacetto.pdf  # bachelor's thesis (Italian)
+│   ├── metrics_multipass.py        # helpers: counts passes and candidates
+│   ├── experiment_passes.py        # experiment A: passes vs memory
+│   ├── experiment_candidates.py    # experiment B: candidates vs bound
+│   └── results/                    # CSV data and PDF figures
+├── thesis-alessandro-barbacetto.pdf       # bachelor's thesis (Italian)
+├── thesis-alessandro-barbacetto-ENG.pdf   # bachelor's thesis (English)
 ├── README.md
-├── LICENSE                       # Apache License 2.0
-└── NOTICE                        # attribution notice
+├── LICENSE                         # Apache License 2.0
+└── NOTICE                          # attribution notice
 ```
 
 ## Requirements
