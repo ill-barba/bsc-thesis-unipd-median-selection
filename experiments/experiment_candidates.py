@@ -307,7 +307,7 @@ def plot_pass_by_pass(ax, raw: list[dict]) -> None:
     ax.set_xlim(-0.4, passes[-1] + 0.4)
     ax.set_ylim(150, 2e5)
     ax.grid(False, which="minor")
-    ax.set_xlabel(r"Passata $P$")
+    ax.set_xlabel(r"Passata $p$")
     ax.set_ylabel("Numero di candidati")
     exponent = round(math.log10(N))
     ax.set_title(rf"(b)  $N=10^{{{exponent}}}$, $S={S}$", loc="left",
@@ -328,14 +328,28 @@ def plot_figure() -> None:
         raise AssertionError("Trovato n_p > n_bar_p: il limite non è rispettato")
 
     set_style()
-    fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(TEXT_WIDTH, 7.0 * CM),
+    # Figura completa: i pannelli sono ora disposti uno sotto l'altro.
+    fig, (ax_a, ax_b) = plt.subplots(2, 1, figsize=(TEXT_WIDTH, 16.0 * CM),
                                     layout="constrained")
     plot_against_bound(ax_a, summary)
     plot_pass_by_pass(ax_b, raw)
 
     path = RESULTS_DIR / "fig_candidates.pdf"
     fig.savefig(path)
+    plt.close(fig)
     print(f"Figura salvata in: {path}")
+
+    # Pannelli singoli per le didascalie (a) e (b) in LaTeX.
+    for suffix, plot, data in (("a", plot_against_bound, summary),
+                            ("b", plot_pass_by_pass, raw)):
+        fig, ax = plt.subplots(figsize=(TEXT_WIDTH, 7.0 * CM),
+                            layout="constrained")
+        plot(ax, data)
+        ax.set_title("")  # La lettera (a)/(b) è aggiunta da subcaption.
+        path = RESULTS_DIR / f"fig_candidates_{suffix}.pdf"
+        fig.savefig(path)
+        plt.close(fig)
+        print(f"Figura salvata in: {path}")
 
 
 if __name__ == "__main__":
