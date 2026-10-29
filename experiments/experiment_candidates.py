@@ -291,9 +291,19 @@ def plot_pass_by_pass(ax, raw: list[dict]) -> None:
 
     ax.plot(passes, bound, color=BOUND_COLOR, linestyle="--", linewidth=1.0,
             marker="s", markersize=3.3, label=r"limite teorico $\bar n_p$")
-    ax.errorbar(passes, mean, yerr=[low, high], color=COLORS[2],
-                marker=MARKERS[2], markersize=4, markerfacecolor="white",
-                elinewidth=0.8, label=r"candidati effettivi $n_p$")
+    ax.errorbar(
+    passes, mean, yerr=[low, high],
+    color=COLORS[2],
+    ecolor="#146D53",
+    marker=MARKERS[2],
+    markersize=4,
+    markerfacecolor="white",
+    elinewidth=1.35,
+    capsize=3.0,
+    capthick=1.2,
+    zorder=5,
+    label=r"candidati effettivi $n_p$"
+    )
 
     # Soglia della passata finale: quando n_bar_p <= S - 2 i candidati
     # rimasti vengono caricati in memoria. Etichetta piccola, a sinistra,
