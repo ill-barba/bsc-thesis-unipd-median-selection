@@ -213,6 +213,11 @@ BOUND_COLOR = "#9F2020"     # rosso scuro: limite teorico n_bar_p
 GUIDE_COLOR = "#124C87"     # blu scuro: riferimenti (n_bar_p / 4 e soglia S - 2)
 GUIDE_FRACTION = 4          # retta guida n_p = n_bar_p / 4, staccata dai dati
 
+# Pannello (a): stessi limiti e stessa scala sui due assi, cosi' la retta
+# n_p = n_bar_p ha pendenza 1 (45 gradi) e il confronto con il limite si
+# legge direttamente dal grafico.
+AXIS_LIMITS = (20, 2e5)
+
 
 def plot_against_bound(ax, summary: list[dict]) -> None:
     """Pannello (a): media di n_p contro n_bar_p, una per configurazione.
@@ -245,7 +250,7 @@ def plot_against_bound(ax, summary: list[dict]) -> None:
                 markeredgecolor=color, zorder=3,
                 label=rf"$N=10^{{{round(math.log10(N))}}}$")
 
-    ends = [60, 1.5e5]
+    ends = list(AXIS_LIMITS)
     ax.plot(ends, ends, color=BOUND_COLOR, linestyle="--", linewidth=1.0)
     ax.plot(ends, [x / GUIDE_FRACTION for x in ends], color=GUIDE_COLOR,
             linestyle="--", linewidth=1.0)
@@ -256,8 +261,11 @@ def plot_against_bound(ax, summary: list[dict]) -> None:
 
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlim(60, 1.5e5)
-    ax.set_ylim(15, 1.5e5)
+    ax.set_xlim(*AXIS_LIMITS)
+    ax.set_ylim(*AXIS_LIMITS)
+    # Una decade ha la stessa lunghezza sui due assi: pannello quadrato e
+    # retta n_p = n_bar_p a 45 gradi.
+    ax.set_aspect("equal", adjustable="box")
     ax.grid(False, which="minor")
     ax.set_xlabel(r"Limite teorico $\bar n_p$")
     ax.set_ylabel(r"Candidati effettivi $n_p$")
@@ -338,9 +346,12 @@ def plot_figure() -> None:
         raise AssertionError("Trovato n_p > n_bar_p: il limite non è rispettato")
 
     set_style()
-    # Figura completa: i pannelli sono ora disposti uno sotto l'altro.
-    fig, (ax_a, ax_b) = plt.subplots(2, 1, figsize=(TEXT_WIDTH, 16.0 * CM),
-                                    layout="constrained")
+    # Figura completa: i pannelli sono affiancati. Il pannello (a) e'
+    # quadrato (stessa scala sui due assi), il pannello (b) ha la stessa
+    # altezza.
+    fig, (ax_a, ax_b) = plt.subplots(
+        1, 2, figsize=(TEXT_WIDTH, 7.6 * CM), layout="constrained",
+        gridspec_kw={"width_ratios": [1, 1.25]})
     plot_against_bound(ax_a, summary)
     plot_pass_by_pass(ax_b, raw)
 
@@ -350,10 +361,12 @@ def plot_figure() -> None:
     print(f"Figura salvata in: {path}")
 
     # Pannelli singoli per le didascalie (a) e (b) in LaTeX.
+    # Il pannello (a) e' quadrato; il (b) ha la stessa altezza, cosi' i due
+    # file si possono affiancare in LaTeX o nella presentazione.
+    sizes = {"a": (8.0 * CM, 8.0 * CM), "b": (10.0 * CM, 8.0 * CM)}
     for suffix, plot, data in (("a", plot_against_bound, summary),
                             ("b", plot_pass_by_pass, raw)):
-        fig, ax = plt.subplots(figsize=(TEXT_WIDTH, 7.0 * CM),
-                            layout="constrained")
+        fig, ax = plt.subplots(figsize=sizes[suffix], layout="constrained")
         plot(ax, data)
         ax.set_title("")  # La lettera (a)/(b) è aggiunta da subcaption.
         path = RESULTS_DIR / f"fig_candidates_{suffix}.pdf"
