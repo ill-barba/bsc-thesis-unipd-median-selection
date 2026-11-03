@@ -8,12 +8,17 @@ the more passes over the input you need. The experiments measure exactly that
 trade-off.
 
 
-## Thesis
+## Thesis and presentation
 
 The bachelor's thesis is available in two languages:
 
 - [Italian version (PDF)](thesis-alessandro-barbacetto.pdf)
 - [English version (PDF)](thesis-alessandro-barbacetto-ENG.pdf)
+
+The slides of the thesis defense are also available in two languages:
+
+- [Italian version (PDF)](presentazione-per-discussione.pdf)
+- [English version (PDF)](thesis-defense-presentation.pdf)
 
 
 ## Layout
@@ -31,6 +36,8 @@ The bachelor's thesis is available in two languages:
 │   └── results/                    # CSV data and PDF figures
 ├── thesis-alessandro-barbacetto.pdf       # bachelor's thesis (Italian)
 ├── thesis-alessandro-barbacetto-ENG.pdf   # bachelor's thesis (English)
+├── presentazione-per-discussione.pdf      # defense slides (Italian)
+├── thesis-defense-presentation.pdf        # defense slides (English)
 ├── README.md
 ├── LICENSE                         # Apache License 2.0
 └── NOTICE                          # attribution notice
