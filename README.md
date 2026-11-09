@@ -93,19 +93,11 @@ measure and check the results.
   recurrence on the candidate bound.
 - `n_p`: actual number of candidates left after sampling pass `p`, counted
   directly on the input.
-- `n̄_p = (2r_p − 1)·2^r_p`: the theoretical upper bound on the candidates
+- `n̄_p`: the theoretical upper bound on the candidates
   after the same pass.
 
 **How the data are generated.** Every input is a random permutation of
 1..N with a fixed seed, so every run can be reproduced exactly.
-
-- Experiment A: N = 10^3, 10^4, 10^5, 10^6; median; seed 2026; S on a
-  geometric grid (factor 2^(1/4)) from the smallest S for which the
-  algorithm terminates up to N + 2. Smaller inputs are checked again with
-  other ranks and seeds.
-- Experiment B: N = 10^4 and 10^5; 30 seeds per configuration. The figure
-  uses the median over a finer grid of S (factor 2^(1/8)); the CSV files also
-  keep four ranks and sorted inputs for four fixed memory sizes.
 
 ## Reference
 
